@@ -1,0 +1,48 @@
+{
+  "person": "nicola",
+  "current": 100000,
+  "base": 95000,
+  "updated": "ESEMPIO FITTIZIO",
+  "holdings": [
+    {
+      "name": "ETF ESEMPIO",
+      "quantity": 10,
+      "price": "100,00 €",
+      "value": "1.000,00 €",
+      "change": "+50,00 €",
+      "changePct": "+5,26%"
+    }
+  ],
+  "allocation": [
+    {
+      "name": "ETF",
+      "value": 65000
+    },
+    {
+      "name": "Azioni",
+      "value": 20000
+    },
+    {
+      "name": "Obbligazioni",
+      "value": 15000
+    }
+  ],
+  "history": [
+    {
+      "date": "2026-09-01",
+      "value": 95000
+    },
+    {
+      "date": "2026-09-15",
+      "value": 97300
+    },
+    {
+      "date": "2026-10-01",
+      "value": 98500
+    },
+    {
+      "date": "2026-10-19",
+      "value": 100000
+    }
+  ]
+}
