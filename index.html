@@ -23,4 +23,59 @@ document.querySelectorAll("[data-period]").forEach(b=>b.addEventListener("click"
 render();
 // Contract for a future authenticated integration: update({current,base,holdings,updated}).
 // Never put API keys, HMAC secrets, private holdings or a public Google Sheet URL here.
+</script>
+<style>
+.tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}.import{background:#243b56;color:#e6f0ff;border:1px solid #45658b;padding:10px 14px;border-radius:11px;font-size:12px;font-weight:650}.import:hover{background:#304b6a}.hint{font-size:11px;color:#93a6c2}.chart svg{width:100%;height:100%;overflow:visible}.chart{padding:12px}.chart svg text{font-family:inherit;fill:#a9b8ce;font-size:11px}.allocation{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px}.legend{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}.legend span{font-size:11px;color:#c4d0e2}.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+</style>
+<script>
+(function(){
+"use strict";
+const vault={nicola:null,madre:null};
+const chart=document.getElementById("chart");
+const allocation=document.querySelector(".grid .card:nth-child(5) .chart");
+const notice=document.querySelector(".notice");
+notice.textContent="Anteprima privata: puoi importare un file JSON dal tuo dispositivo per vedere grafici e rendimenti reali. I dati rimangono in memoria nel browser e non vengono inviati a GitHub.";
+const tools=document.createElement("div");tools.className="tools";tools.innerHTML='<label class="import" for="private-file">Importa dati privati (JSON)</label><input type="file" id="private-file" accept=".json,application/json" hidden><span class="hint">Solo sul dispositivo · nessun caricamento al server</span>';
+notice.after(tools);
+const escapeHTML=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const colors=["#5bd8b0","#89aefc","#dfb975","#d494ef","#f58a9a","#74c9de"];
+function snapshot(){return vault[person]}
+function rowsForPeriod(history){const days={"1S":7,"1M":31,"3M":93,"6M":186,"1A":366,"MAX":Infinity}[period];const end=history[history.length-1].date;const endDate=new Date(end+"T12:00:00Z");return history.filter(x=>(endDate-new Date(x.date+"T12:00:00Z"))/86400000<=days)}
+function drawHistory(){
+ const d=snapshot();if(!d||!Array.isArray(d.history)){chart.innerHTML='<div class="empty"><strong>Storico non disponibile</strong>Importa dati reali per visualizzare il grafico.</div>';return}
+ const all=d.history.filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&Number.isFinite(x.value)).sort((a,b)=>a.date.localeCompare(b.date));
+ const a=rowsForPeriod(all);if(a.length<2){chart.innerHTML='<div class="empty"><strong>Storico insufficiente</strong>Servono almeno due rilevazioni autentiche nel periodo selezionato.</div>';return}
+ const lo=Math.min(...a.map(x=>x.value)),hi=Math.max(...a.map(x=>x.value)),spread=Math.max(hi-lo,1),w=680,h=240,left=64,top=18,usableW=w-left-16,usableH=h-top-34;
+ const points=a.map((p,i)=>[left+i*usableW/(a.length-1),top+(hi-p.value)/spread*usableH]);
+ const path=points.map((p,i)=>(i?"L":"M")+p.map(n=>n.toFixed(1)).join(" ")).join(" ");
+ const axis=[0,.5,1].map(fr=>{const y=top+fr*usableH,v=hi-fr*spread;return '<line x1="'+left+'" y1="'+y+'" x2="'+(w-16)+'" y2="'+y+'" stroke="#2c3d55" stroke-dasharray="4 6"/><text x="0" y="'+(y+4)+'">'+escapeHTML(new Intl.NumberFormat("it-IT",{notation:"compact",maximumFractionDigits:1}).format(v))+'</text>'}).join("");
+ const first=a[0].date,last=a[a.length-1].date;
+ chart.innerHTML='<svg role="img" aria-label="Andamento del patrimonio dal '+escapeHTML(first)+' al '+escapeHTML(last)+'" viewBox="0 0 '+w+' '+h+'">'+axis+'<path d="'+path+'" fill="none" stroke="#58dbb0" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="'+points.at(-1)[0]+'" cy="'+points.at(-1)[1]+'" r="5" fill="#58dbb0"/><text x="'+left+'" y="'+(h-5)+'">'+escapeHTML(first)+'</text><text x="'+(w-16)+'" y="'+(h-5)+'" text-anchor="end">'+escapeHTML(last)+'</text></svg>';
+}
+function drawAllocation(){
+ const d=snapshot();if(!d||!Array.isArray(d.allocation)||!d.allocation.length){allocation.innerHTML='<div class="empty"><strong>Ripartizione per categoria</strong>Disponibile dopo l’importazione dei dati.</div>';return}
+ const a=d.allocation.filter(x=>typeof x.name==="string"&&Number.isFinite(x.value)&&x.value>0).slice(0,12),total=a.reduce((n,x)=>n+x.value,0);
+ if(!total)return;
+ let acc=0;const segments=a.map((x,i)=>{const from=acc/total*100;acc+=x.value;return colors[i%colors.length]+" "+from+"% "+acc/total*100+"%"}).join(", ");
+ allocation.innerHTML='<div class="allocation"><div role="img" aria-label="Composizione del portafoglio" style="width:152px;height:152px;border-radius:50%;background:conic-gradient('+segments+');display:grid;place-items:center"><div style="background:#121a29;border-radius:50%;width:103px;height:103px;display:grid;place-items:center;color:#e6f0ff;font-weight:700">100%</div></div><div class="legend">'+a.map((x,i)=>'<span><i style="background:'+colors[i%colors.length]+'"></i>'+escapeHTML(x.name)+' '+(x.value/total*100).toFixed(1)+'%</span>').join("")+'</div></div>';
+}
+function apply(){
+ const d=snapshot();if(d){update(d);document.getElementById("mode").textContent="DATI IMPORTATI · SESSIONE LOCALE";document.getElementById("updated").textContent=d.updated?"Rilevazione: "+d.updated:"Dati importati";}else{document.getElementById("mode").textContent="ANTEPRIMA · DATI NON COLLEGATI";document.getElementById("updated").textContent="In attesa del collegamento"}
+ drawHistory();drawAllocation();
+}
+document.getElementById("private-file").addEventListener("change",async function(){
+ const file=this.files[0];if(!file)return;
+ if(file.size>2e6){alert("File troppo grande (limite 2 MB).");this.value="";return}
+ try{const d=JSON.parse(await file.text());
+ if(!d||!["nicola","madre"].includes(d.person)||!Number.isFinite(d.current)||d.current<0||!Number.isFinite(d.base)||d.base<0)throw Error("Servono person, current e base validi.");
+ if(d.history&&(!Array.isArray(d.history)||d.history.length>20000||d.history.some(x=>typeof x.date!=="string"||!Number.isFinite(x.value)||x.value<0)))throw Error("Storico non valido.");
+ if(d.allocation&&(!Array.isArray(d.allocation)||d.allocation.length>30))throw Error("Composizione non valida.");
+ if(d.holdings&&(!Array.isArray(d.holdings)||d.holdings.length>500))throw Error("Investimenti non validi.");
+ vault[d.person]=d;document.getElementById(d.person).click();
+ }catch(err){alert("Impossibile importare: "+err.message)}finally{this.value=""}
+});
+for(const id of ["nicola","madre"])document.getElementById(id).addEventListener("click",apply);
+document.querySelectorAll("[data-period]").forEach(b=>b.addEventListener("click",drawHistory));
+apply();
+})();
 </script></body></html>
